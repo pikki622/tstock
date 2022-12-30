@@ -71,7 +71,7 @@ def parse_args(parser: argparse.ArgumentParser):
             opts["intervals_back"] = 70
         if opts["max_y"] == -1:
             opts["max_y"] = 40
-    
+
 
     # Infer the asset class from the input
     if '/' in opts['ticker']:
@@ -84,39 +84,48 @@ def parse_args(parser: argparse.ArgumentParser):
         opts['asset_class'] = "crypto"
 
     # Validate arguments for time interval and asset class
-    if args.t:
-        if args.t not in ['1min', '5min', '15min', '30min', '60min', 'day', 'week', 'month']:
-            print(f"Invalid interval value {args.t}.")
-            sys.exit(1)
-    if opts['asset_class']:
-        if not opts['asset_class'] in ['stock', 'crypto', 'forex']:
-            print(f"Invalid class value {opts['asset_class']}.")
-            sys.exit(1)
-    
+    if args.t and args.t not in [
+        '1min',
+        '5min',
+        '15min',
+        '30min',
+        '60min',
+        'day',
+        'week',
+        'month',
+    ]:
+        print(f"Invalid interval value {args.t}.")
+        sys.exit(1)
+    if opts['asset_class'] and opts['asset_class'] not in [
+        'stock',
+        'crypto',
+        'forex',
+    ]:
+        print(f"Invalid class value {opts['asset_class']}.")
+        sys.exit(1)
+
     # Validate arguments for upcolor and downcolor
-    if args.upcolor:
-        if args.upcolor not in ['green', 'red', 'blue']:
-            print(f"Invalid color {args.upcolor}.")
-            sys.exit(1)
-    if args.downcolor:
-        if args.downcolor not in ['green', 'red', 'blue']:
-            print(f"Invalid color {args.downcolor}.")
-            sys.exit(1)
-    
+    if args.upcolor and args.upcolor not in ['green', 'red', 'blue']:
+        print(f"Invalid color {args.upcolor}.")
+        sys.exit(1)
+    if args.downcolor and args.downcolor not in ['green', 'red', 'blue']:
+        print(f"Invalid color {args.downcolor}.")
+        sys.exit(1)
+
 
     # Handle currency symbol for -c option
     if args.c != 'USD' and opts['asset_class'] != 'crypto':
         print("Warning: the -c flag is only supported for asset type 'crypto'. It will be ignored.")
     if args.c != 'USD' and opts['asset_class'] == 'crypto':
         c = args.c.upper()
-        if not c in valid_currencies:
+        if c not in valid_currencies:
             print(f"Invalid currency {c}")
             sys.exit(1)
         if c in list(currency_symbols.keys()):
             opts['currency_symbol'] = currency_symbols[c]
         else:
             opts['currency_symbol'] = ''
-    
+
     # Handle currency symbol for forex
     if opts['asset_class'] == 'forex':
         if args.ticker.count("/") != 1:
@@ -125,10 +134,10 @@ def parse_args(parser: argparse.ArgumentParser):
         ticker = args.ticker.split("/")
         from_currency = ticker[0].upper()
         to_currency = ticker[1].upper()
-        if not from_currency in valid_currencies:
+        if from_currency not in valid_currencies:
             print(f"Invalid currency {from_currency}")
             sys.exit(1)
-        if not to_currency in valid_currencies:
+        if to_currency not in valid_currencies:
             print(f"Invalid currency {to_currency}")
             sys.exit(1)
         if to_currency in list(currency_symbols.keys()):

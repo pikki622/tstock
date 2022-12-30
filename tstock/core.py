@@ -30,15 +30,14 @@ def translate(x: float, l1: float, h1: float, l2: float, h2: float) -> float:
 
 def get_api_key() -> str:
     """Gets the API key from the environment variable ALPHAVANTAGE_API_KEY, raises an error if not found."""
-    if os.getenv('ALPHAVANTAGE_API_KEY') == None:
-        print("error: API key not detected! Follow these instructions to get your API Key working:\n" + \
-        "- Make a free AlphaVantage API account at https://www.alphavantage.co/support/#api-key\n" + \
-        "- After creating the account, you will see your free API key\n" + \
-        "- Run \"export ALPHAVANTAGE_API_KEY=<your access key>\"." + \
-        "You can make this permanent by adding this line to your .bashrc\n")
-        sys.exit(1)
-    else:
+    if os.getenv('ALPHAVANTAGE_API_KEY') is not None:
         return os.getenv('ALPHAVANTAGE_API_KEY')
+    print("error: API key not detected! Follow these instructions to get your API Key working:\n" + \
+    "- Make a free AlphaVantage API account at https://www.alphavantage.co/support/#api-key\n" + \
+    "- After creating the account, you will see your free API key\n" + \
+    "- Run \"export ALPHAVANTAGE_API_KEY=<your access key>\"." + \
+    "You can make this permanent by adding this line to your .bashrc\n")
+    sys.exit(1)
 
 
 def print_search(opts: dict):
@@ -83,12 +82,9 @@ def print_short(opts: dict):
     verbose = opts["verbose"]
     currency = opts["currency"]
     currency_symbol = opts["currency_symbol"]
-    
-    # Vary request url depending on the asset class
-    if asset_class == "stock":
-        request_url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={apikey}'
 
-    elif asset_class == "crypto":
+    # Vary request url depending on the asset class
+    if asset_class == "crypto":
         request_url = f'https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency={ticker}&apikey={apikey}&to_currency={currency}'
 
     elif asset_class == "forex":
@@ -96,6 +92,9 @@ def print_short(opts: dict):
         from_currency = ticker[0]
         to_currency = ticker[1]
         request_url = f'https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency={from_currency}&to_currency={to_currency}&apikey={apikey}'
+    elif asset_class == "stock":
+        request_url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={ticker}&apikey={apikey}'
+
     if verbose:
         print(f"API Key: {apikey}\nRequest URL: {request_url}")
 
@@ -118,11 +117,11 @@ def print_short(opts: dict):
     if not bool(data):
         print("Error: The API did not return data.")
         sys.exit(1)
-    
+
     # Output the data. Stocks pretty much never matter on the interval of below one penny, but crypto and forex can
     if asset_class == "stock":
         print(currency_symbol + "{:,.2f}".format(float(data["05. price"])))
-    elif asset_class == "crypto" or asset_class == "forex":
+    elif asset_class in ["crypto", "forex"]:
         price = float(data["5. Exchange Rate"])
         if price < 0.01:
             print(currency_symbol + "{:,.5f}".format(price))
@@ -141,24 +140,9 @@ def get_request_url(opts: dict):
     intraday = 'min' in interval
     verbose = opts["verbose"]
     currency = opts["currency"]
-    
+
     # Builds different request_urls corresponding to the endpoints of the API, depending on which asset class is specified.
-    if asset_class == "stock":
-        if interval == 'day':
-            api_function = 'TIME_SERIES_DAILY'
-        elif interval == 'week':
-            api_function = 'TIME_SERIES_WEEKLY'
-        elif interval == 'month':
-            api_function = 'TIME_SERIES_MONTHLY'
-        elif intraday:
-            api_function = 'TIME_SERIES_INTRADAY'
-    
-        request_url = f'https://www.alphavantage.co/query?function={api_function}&symbol={ticker}&apikey={apikey}&outputsize={full}'
-
-        if intraday:
-            request_url += f"&interval={interval}"
-
-    elif asset_class == "crypto":
+    if asset_class == "crypto":
         if interval == 'day':
             api_function = 'DIGITAL_CURRENCY_DAILY'
         elif interval == 'week':
@@ -173,8 +157,6 @@ def get_request_url(opts: dict):
 
     elif asset_class == "forex":
         ticker = ticker.split("/")
-        from_currency = ticker[0]
-        to_currency = ticker[1]
         if interval == 'day':
             api_function = 'FX_DAILY'
         elif interval == 'week':
@@ -183,9 +165,26 @@ def get_request_url(opts: dict):
             api_function = 'FX_MONTHLY'
         elif intraday:
             api_function = 'FX_INTRADAY'
+        from_currency = ticker[0]
+        to_currency = ticker[1]
         request_url = f'https://www.alphavantage.co/query?function={api_function}&from_symbol={from_currency}&to_symbol={to_currency}&apikey={apikey}'
         if interval == 'day' or intraday:
             request_url += f"&outputsize={full}"
+        if intraday:
+            request_url += f"&interval={interval}"
+
+    elif asset_class == "stock":
+        if interval == 'day':
+            api_function = 'TIME_SERIES_DAILY'
+        elif interval == 'week':
+            api_function = 'TIME_SERIES_WEEKLY'
+        elif interval == 'month':
+            api_function = 'TIME_SERIES_MONTHLY'
+        elif intraday:
+            api_function = 'TIME_SERIES_INTRADAY'
+
+        request_url = f'https://www.alphavantage.co/query?function={api_function}&symbol={ticker}&apikey={apikey}&outputsize={full}'
+
         if intraday:
             request_url += f"&interval={interval}"
 
@@ -221,26 +220,8 @@ def get_candlesticks(opts: dict) -> list:
 
     # Parse API data
     candlesticks = []
-    if asset_class == "stock":
-        for k, v in data.items():
-            candlesticks.append([
-                float(v['1. open']),
-                float(v['2. high']),
-                float(v['3. low']),
-                float(v['4. close']), -1
-            ])
-            if interval in ['day', 'week']:
-                candlesticks[-1][4] = int(k[8:])
-            elif interval == 'month':
-                candlesticks[-1][4] = int(k[5:7])
-            elif interval in ['1min', '5min']:
-                candlesticks[-1][4] = int(k[14:16])
-            elif interval in ['15min', '30min', '60min']:
-                candlesticks[-1][4] = int(k[11:13])
-            if len(candlesticks) == intervals_back:
-                break
-    elif asset_class == "crypto":
-        for k, v in data.items():
+    for k, v in data.items():
+        if asset_class == "crypto":
             prices = [ float(price) for name, price in v.items() ]
             if intraday:
                 candlesticks.append([
@@ -266,8 +247,7 @@ def get_candlesticks(opts: dict) -> list:
                 candlesticks[-1][4] = int(k[11:13])
             if len(candlesticks) == intervals_back:
                 break
-    elif asset_class == "forex":
-        for k, v in data.items():
+        elif asset_class == "forex":
             prices = [ float(price) for name, price in v.items() ]
             candlesticks.append([
                 float(prices[0]),
@@ -286,9 +266,24 @@ def get_candlesticks(opts: dict) -> list:
             if len(candlesticks) == intervals_back:
                 break
 
-    candlesticks = list(reversed(candlesticks))
-
-    return candlesticks
+        elif asset_class == "stock":
+            candlesticks.append([
+                float(v['1. open']),
+                float(v['2. high']),
+                float(v['3. low']),
+                float(v['4. close']), -1
+            ])
+            if interval in ['day', 'week']:
+                candlesticks[-1][4] = int(k[8:])
+            elif interval == 'month':
+                candlesticks[-1][4] = int(k[5:7])
+            elif interval in ['1min', '5min']:
+                candlesticks[-1][4] = int(k[14:16])
+            elif interval in ['15min', '30min', '60min']:
+                candlesticks[-1][4] = int(k[11:13])
+            if len(candlesticks) == intervals_back:
+                break
+    return list(reversed(candlesticks))
 
 
 def draw_graph(opts: dict):
@@ -325,7 +320,7 @@ def draw_graph(opts: dict):
 
     # Create the chart
     chart = np.full((max_y, max_x), " ")
-    column_colors = ["\x1b[0m" for x in range(max_x)]  # Stores ANSI escape sequences for printing color
+    column_colors = ["\x1b[0m" for _ in range(max_x)]
     # Draw borders
     chart[0, :] = "─"
     chart[-1, :] = "─"
@@ -374,12 +369,9 @@ def draw_graph(opts: dict):
         # Positive day, stock went up
         if c[0] < c[3]:
             column_colors[shifted_i] = ANSI_colors[upcolor]
-            tmp = translated_low
-            translated_low = translated_high
-            translated_high = tmp
+            translated_low, translated_high = translated_high, translated_low
             for y in range(translated_close, translated_open + 1):
                 chart[y, shifted_i] = "█"
-        # Negative day, stock went down
         else:
             column_colors[shifted_i] = ANSI_colors[downcolor]
             for y in range(translated_open, translated_close + 1):
